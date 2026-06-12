@@ -12,15 +12,29 @@ from ro_id_synth.pipeline import render_card_from_template, render_final_sample
 from ro_id_synth.quality_filter import MAX_RETRIES, validate_sample
 from ro_id_synth.records import generate_record
 from ro_id_synth.template_config import TemplateSpec, load_template_spec
+from ro_id_synth.template_registry import load_generation_mix
 
 _TEMPLATE_SPEC: TemplateSpec | None = None
+_TEMPLATE_SPECS: dict[str, TemplateSpec] = {}
+_TEMPLATE_WEIGHTS: list[tuple[str, float]] = []
 
 
 def init_pool(config_path: str, base_dir: str) -> None:
-    global _TEMPLATE_SPEC
+    global _TEMPLATE_SPEC, _TEMPLATE_SPECS, _TEMPLATE_WEIGHTS
     base = Path(base_dir)
     cfg = Path(config_path)
     _TEMPLATE_SPEC = load_template_spec(cfg, base)
+    _TEMPLATE_SPECS = {}
+    _TEMPLATE_WEIGHTS = []
+
+
+def init_pool_multi(mix_path: str, base_dir: str) -> None:
+    global _TEMPLATE_SPEC, _TEMPLATE_SPECS, _TEMPLATE_WEIGHTS
+    base = Path(base_dir)
+    specs, weights = load_generation_mix(Path(mix_path), base)
+    _TEMPLATE_SPEC = None
+    _TEMPLATE_SPECS = specs
+    _TEMPLATE_WEIGHTS = weights
 
 
 def _spec() -> TemplateSpec:
@@ -29,16 +43,26 @@ def _spec() -> TemplateSpec:
     return _TEMPLATE_SPEC
 
 
+def _pick_spec(rng: np.random.Generator) -> TemplateSpec:
+    if not _TEMPLATE_SPECS:
+        return _spec()
+    keys = [k for k, _ in _TEMPLATE_WEIGHTS]
+    probs = np.array([w for _, w in _TEMPLATE_WEIGHTS], dtype=np.float64)
+    probs /= probs.sum()
+    key = keys[int(rng.choice(len(keys), p=probs))]
+    return _TEMPLATE_SPECS[key]
+
+
 def generate_one_image(
     global_idx: int,
     base_seed: int,
     rng: np.random.Generator | None = None,
     *,
     skip_quality: bool = False,
-) -> tuple[np.ndarray, str, np.ndarray]:
+) -> tuple[np.ndarray, str, np.ndarray, str]:
     if rng is None:
         rng = np.random.default_rng(base_seed + global_idx)
-    spec = _spec()
+    spec = _pick_spec(rng)
 
     for attempt in range(MAX_RETRIES if not skip_quality else 1):
         record = generate_record(seed=base_seed + global_idx + attempt * 9973)
@@ -46,15 +70,15 @@ def generate_one_image(
 
         if skip_quality:
             payload = json.dumps({"transcription": transcription}, ensure_ascii=False)
-            return final, payload, card
+            return final, payload, card, spec.key
 
         passed, _score, _reason = validate_sample(final, card, record, _legacy_cfg_from_spec(spec))
         if passed:
             payload = json.dumps({"transcription": transcription}, ensure_ascii=False)
-            return final, payload, card
+            return final, payload, card, spec.key
 
     payload = json.dumps({"transcription": transcription}, ensure_ascii=False)
-    return final, payload, card
+    return final, payload, card, spec.key
 
 
 def _legacy_cfg_from_spec(spec: TemplateSpec):
@@ -75,7 +99,7 @@ def _legacy_cfg_from_spec(spec: TemplateSpec):
     return TemplateConfig(
         key=spec.key,
         path=spec.image_path,
-        auto_rotate=False,
+        auto_rotate=spec.auto_rotate,
         kind=spec.kind,
         fields=fields,
     )
@@ -102,7 +126,7 @@ def _process_batch(args: tuple) -> dict[str, int]:
     lines: list[str] = []
     for i in range(batch_size):
         global_idx = start_index + i
-        img, payload, _card = generate_one_image(global_idx, base_seed, rng)
+        img, payload, _card, _tpl_key = generate_one_image(global_idx, base_seed, rng)
 
         fname = f"{global_idx:07d}.jpg"
         cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 90])[1].tofile(str(images_path / fname))

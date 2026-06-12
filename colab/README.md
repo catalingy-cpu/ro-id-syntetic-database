@@ -16,13 +16,17 @@ Tot pipeline-ul într-un singur notebook: **imagini sintetice** → **antrenare 
 ```python
 REPO_URL = "https://github.com/USER/ro-id.git"
 
-GENERATE_DATASET = True              # generează imagini în Colab
-GENERATE_COUNT = 5000                # 5k–20k OK; 50k+ pe Drive
-SKIP_GENERATION_IF_EXISTS = True     # refolosește dataset de pe Drive
+GENERATE_DATASET = True
+GENERATE_MULTI = True                # clasic + electronic + telefon
+GENERATE_MIX = "config/generation_mix.json"
+GENERATE_COUNT = 5000
+SKIP_GENERATION_IF_EXISTS = True
 
 DATASET_DIR = "/content/drive/MyDrive/ro-id/dataset_colab"
 MOUNT_GOOGLE_DRIVE = True
 ```
+
+`classic_reference` (ROI calibrat) rămâne în mix — nu e atins. Pentru un singur template: `GENERATE_MULTI = False`.
 
 ### De ce Google Drive?
 

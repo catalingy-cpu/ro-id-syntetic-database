@@ -2,48 +2,15 @@
 
 from __future__ import annotations
 
-import os
-import platform
-
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from ro_id_synth.fonts import resolve_font
 from ro_id_synth.font_metrics import target_font_size
 from ro_id_synth.inpaint import inpaint_text_regions
 from ro_id_synth.records import SyntheticIdRecord
 from ro_id_synth.roi import FieldRoi, TemplateConfig
-
-_FONT_CACHE: dict[tuple[str, int], ImageFont.FreeTypeFont | ImageFont.ImageFont] = {}
-
-
-def _font_candidates(kind: str) -> list[str]:
-    win = os.environ.get("WINDIR", r"C:\Windows")
-    fonts_dir = os.path.join(win, "Fonts")
-    if kind == "classic":
-        names = ["arialbd.ttf", "Arialbd.ttf", "calibrib.ttf", "consolab.ttf"]
-    else:
-        names = ["calibrib.ttf", "arialbd.ttf", "arialn.ttf", "calibri.ttf"]
-    if platform.system() == "Windows":
-        return [os.path.join(fonts_dir, n) for n in names] + names
-    return names + ["DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf"]
-
-
-def _resolve_font(size: int, kind: str = "classic") -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    key = (kind, size)
-    if key in _FONT_CACHE:
-        return _FONT_CACHE[key]
-    for path in _font_candidates(kind):
-        try:
-            font = ImageFont.truetype(path, size=size)
-            _FONT_CACHE[key] = font
-            return font
-        except OSError:
-            continue
-    font = ImageFont.load_default()
-    _FONT_CACHE[key] = font
-    return font
-
 
 def _resolve_ink_bgr(template_bgr: np.ndarray, roi: FieldRoi, preset: str, kind: str) -> tuple[int, int, int]:
     if preset == "red":
@@ -72,7 +39,7 @@ def _fit_font_size(
     """Păstrează dimensiunea țintă (±10% deja aplicat); micșorează doar dacă depășește lățimea."""
     size = target
     for _ in range(12):
-        font = _resolve_font(size, kind)
+        font = resolve_font(size, kind)
         bbox = font.getbbox(text)
         tw = bbox[2] - bbox[0]
         if tw <= int(box_w * 0.98) or size <= min_size:
@@ -100,7 +67,7 @@ def _draw_field_with_key(
     ink_bgr = _resolve_ink_bgr(template_bgr, roi, roi.ink, kind)
     target = target_font_size(template_key, field_key, roi, box_h, kind, rng)
     size = _fit_font_size(text, box_w, target, kind)
-    font = _resolve_font(size, kind)
+    font = resolve_font(size, kind)
     bbox = font.getbbox(text)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
 

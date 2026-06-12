@@ -63,6 +63,14 @@ Producție (contact sheet la fiecare 200 imagini):
 python generate.py --count 10000 --workers 4 --output dataset
 ```
 
+Multi-template (clasic calibrat + specimen + eID + telefon):
+
+```powershell
+python generate.py --multi --count 10000 --workers 4 --output dataset
+```
+
+Mix-ul e în `config/generation_mix.json` — `classic_reference` folosește `template_fields.json` neschimbat.
+
 ## Filtru OCR (Faza 7)
 
 ```powershell

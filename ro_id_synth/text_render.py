@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-import os
-import platform
-
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from ro_id_synth.fonts import resolve_font
 from ro_id_synth.records import SyntheticIdRecord
 from ro_id_synth.template_config import FieldRect, TemplateSpec
 from ro_id_synth.text_style import TextStyle, estimate_style
-
-_FONT_CACHE: dict[tuple[str, int], ImageFont.FreeTypeFont | ImageFont.ImageFont] = {}
 
 CNP_COLORS_RGB = [
     (30, 70, 200),
@@ -32,35 +28,6 @@ CNP_COLORS_RGB = [
 ]
 
 
-def _font_paths(kind: str) -> list[str]:
-    win = os.environ.get("WINDIR", r"C:\Windows")
-    fonts = os.path.join(win, "Fonts")
-    names = (
-        ["arialbd.ttf", "Arialbd.ttf", "calibrib.ttf"]
-        if kind == "classic"
-        else ["calibrib.ttf", "arialbd.ttf"]
-    )
-    if platform.system() == "Windows":
-        return [os.path.join(fonts, n) for n in names] + names
-    return names + ["DejaVuSans-Bold.ttf"]
-
-
-def _resolve_font(size: int, kind: str) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    key = (kind, size)
-    if key in _FONT_CACHE:
-        return _FONT_CACHE[key]
-    for path in _font_paths(kind):
-        try:
-            font = ImageFont.truetype(path, size=size)
-            _FONT_CACHE[key] = font
-            return font
-        except OSError:
-            continue
-    font = ImageFont.load_default()
-    _FONT_CACHE[key] = font
-    return font
-
-
 def _fit_width(
     text: str,
     max_w: int,
@@ -72,7 +39,7 @@ def _fit_width(
 ) -> int:
     floor = max(min_size, size)
     for s in range(floor, min_size - 1, -1):
-        font = _resolve_font(s, kind)
+        font = resolve_font(s, kind)
         w = _text_width(text, font, spacing)
         if w <= int(max_w * 0.98):
             return s
@@ -149,7 +116,7 @@ def _draw_cnp_multicolor(
         style.letter_spacing,
         min_size=min_cnp,
     )
-    font = _resolve_font(size, kind)
+    font = resolve_font(size, kind)
     bbox = font.getbbox("0")
     th = bbox[3] - bbox[1]
     ty = y1 + max(0, (y2 - y1 - th) // 2) - bbox[1]
@@ -188,7 +155,7 @@ def _draw_field(
         style.letter_spacing,
         min_size=min_size,
     )
-    font = _resolve_font(size, spec.kind)
+    font = resolve_font(size, spec.kind)
     tw = _text_width(text, font, style.letter_spacing)
     bbox = font.getbbox(text)
     th = bbox[3] - bbox[1]
@@ -204,19 +171,30 @@ def _draw_field(
 
 
 def field_values(record: SyntheticIdRecord) -> dict[str, str]:
+    doc_id = f"{record.serie}{record.numar}"
     return {
         "series": record.serie,
+        "serie": record.serie,
         "number": record.numar,
+        "numar": record.numar,
         "cnp": record.cnp,
         "surname": record.nume,
+        "nume": record.nume,
         "given_name": record.prenume,
+        "prenume": record.prenume,
         "nationality": record.cetatenie,
+        "cetatenie": record.cetatenie,
         "birth_place": record.loc_nastere,
+        "loc_nastere": record.loc_nastere,
         "address_line1": record.adresa_line1,
         "address_line2": record.adresa_line2,
+        "adresa_1": record.adresa_line1,
+        "adresa_2": record.adresa_line2,
         "issued_by": record.issued_by,
         "validity": record.validity_display,
         "sex": record.sex,
+        "data_nasterii": record.birth_date_display,
+        "document_id": doc_id,
     }
 
 

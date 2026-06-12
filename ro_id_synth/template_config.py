@@ -33,11 +33,14 @@ class TemplateSpec:
     height: int
     kind: str
     fields: dict[str, FieldRect]
+    auto_rotate: bool = False
 
     def load_image(self) -> np.ndarray:
         img = cv2.imdecode(np.fromfile(str(self.image_path), dtype=np.uint8), cv2.IMREAD_COLOR)
         if img is None:
             raise FileNotFoundError(f"Template negăsit: {self.image_path}")
+        if self.auto_rotate and img.shape[0] > img.shape[1]:
+            img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
         return img
 
 

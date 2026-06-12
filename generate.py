@@ -14,7 +14,8 @@ from ro_id_synth.debug_grid import build_debug_grid
 from ro_id_synth.pipeline import write_debug_triplet
 from ro_id_synth.records import generate_record
 from ro_id_synth.template_config import load_template_spec, save_fields_overlay
-from ro_id_synth.worker import _process_batch, init_pool
+from ro_id_synth.template_registry import load_generation_mix
+from ro_id_synth.worker import _process_batch, init_pool, init_pool_multi
 
 
 def merge_label_parts(labels_dir: Path, out_file: Path) -> None:
@@ -38,7 +39,18 @@ def main() -> None:
         "--fields",
         type=str,
         default=str(Path(__file__).parent / "config" / "template_fields.json"),
-        help="template_fields.json — coordonate câmpuri",
+        help="template_fields.json — coordonate câmpuri (mod single)",
+    )
+    parser.add_argument(
+        "--multi",
+        action="store_true",
+        help="Generează din toate template-urile (classic + eID + telefon)",
+    )
+    parser.add_argument(
+        "--mix",
+        type=str,
+        default=str(Path(__file__).parent / "config" / "generation_mix.json"),
+        help="Mix template-uri pentru --multi",
     )
     parser.add_argument("--debug-grid", action="store_true")
     parser.add_argument("--grid-count", type=int, default=100)
@@ -47,12 +59,21 @@ def main() -> None:
 
     base_dir = Path(__file__).parent.resolve()
     fields_path = Path(args.fields).resolve()
+    mix_path = Path(args.mix).resolve()
     out_root = Path(args.output).resolve()
     debug_dir = out_root / "debug"
 
-    spec = load_template_spec(fields_path, base_dir)
-    if not spec.image_path.is_file():
-        raise FileNotFoundError(f"Template lipsă: {spec.image_path}")
+    if args.multi:
+        specs, weights = load_generation_mix(mix_path, base_dir)
+        spec = specs["classic_reference"] if "classic_reference" in specs else next(iter(specs.values()))
+        pool_config = str(mix_path)
+        init_fn = init_pool_multi
+    else:
+        spec = load_template_spec(fields_path, base_dir)
+        if not spec.image_path.is_file():
+            raise FileNotFoundError(f"Template lipsă: {spec.image_path}")
+        pool_config = str(fields_path)
+        init_fn = init_pool
 
     if args.analyze:
         debug_dir = Path(args.output).resolve() / "debug"
@@ -80,7 +101,16 @@ def main() -> None:
     # Triplet debug la start
     import numpy as np
 
-    write_debug_triplet(spec, generate_record(seed=args.seed), np.random.default_rng(args.seed), debug_dir)
+    if args.multi:
+        for key, tpl in specs.items():
+            tpl_debug = debug_dir / key
+            tpl_debug.mkdir(parents=True, exist_ok=True)
+            save_fields_overlay(tpl, tpl_debug / "fields_overlay.jpg")
+            write_debug_triplet(tpl, generate_record(seed=args.seed), np.random.default_rng(args.seed), tpl_debug)
+        mix_summary = ", ".join(f"{k}={int(w)}" for k, w in weights)
+        print(f"Multi-template mix: {mix_summary}")
+    else:
+        write_debug_triplet(spec, generate_record(seed=args.seed), np.random.default_rng(args.seed), debug_dir)
 
     batch_size = max(1, args.batch_size)
     total = args.count
@@ -94,22 +124,25 @@ def main() -> None:
             str(labels_dir),
             args.seed,
             str(debug_dir),
-            str(fields_path),
+            str(pool_config),
             str(base_dir),
         )
         for b in range(num_batches)
     ]
 
-    print(f"Template: {spec.image_path.name} | {total} imagini | {args.workers} workers")
+    if args.multi:
+        print(f"Multi-template | {total} imagini | {args.workers} workers | mix: {mix_path.name}")
+    else:
+        print(f"Template: {spec.image_path.name} | {total} imagini | {args.workers} workers")
     t0 = time.perf_counter()
-    init_args = (str(fields_path), str(base_dir))
+    init_args = (str(pool_config), str(base_dir))
 
     if args.workers <= 1:
-        init_pool(*init_args)
+        init_fn(*init_args)
         for wa in tqdm(worker_args, desc="batch"):
             _process_batch(wa)
     else:
-        with mp.Pool(processes=args.workers, initializer=init_pool, initargs=init_args) as pool:
+        with mp.Pool(processes=args.workers, initializer=init_fn, initargs=init_args) as pool:
             list(tqdm(pool.imap_unordered(_process_batch, worker_args), total=len(worker_args), desc="batch"))
 
     merge_label_parts(labels_dir, labels_dir / "train.txt")
@@ -117,7 +150,8 @@ def main() -> None:
     print(f"Gata: {images_dir} ({total} imagini, {elapsed:.1f}s)")
     print(f"Debug: {debug_dir}/")
 
-    build_debug_grid(str(fields_path), str(base_dir), debug_dir / "grid_final.jpg", count=min(100, total), seed=args.seed)
+    if not args.multi:
+        build_debug_grid(str(fields_path), str(base_dir), debug_dir / "grid_final.jpg", count=min(100, total), seed=args.seed)
 
 
 if __name__ == "__main__":

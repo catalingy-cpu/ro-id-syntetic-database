@@ -8,7 +8,14 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from ro_id_synth.worker import generate_one_image, init_pool  # noqa: F401
+from ro_id_synth.worker import generate_one_image, init_pool, init_pool_multi  # noqa: F401
+
+
+def _init_from_config(config_path: str, base_dir: str) -> None:
+    if Path(config_path).name == "generation_mix.json":
+        init_pool_multi(config_path, base_dir)
+    else:
+        init_pool(config_path, base_dir)
 
 
 def _render_grid(
@@ -43,11 +50,11 @@ def build_debug_grid(
     thumb_w: int = 360,
     thumb_h: int = 220,
 ) -> Path:
-    init_pool(config_path, base_dir)
+    _init_from_config(config_path, base_dir)
     rng = np.random.default_rng(seed)
     images: list[np.ndarray] = []
     for i in range(count):
-        img, _, _ = generate_one_image(i, seed, rng, skip_quality=True)
+        img, _, _, _ = generate_one_image(i, seed, rng, skip_quality=True)
         images.append(img)
     return _render_grid(images, output_path, cols=cols, thumb_w=thumb_w, thumb_h=thumb_h)
 

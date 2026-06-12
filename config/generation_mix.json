@@ -1,0 +1,47 @@
+{
+  "description": "Mix antrenare: classic_reference (ROI calibrat) + specimen YAML",
+  "templates": {
+    "classic_reference": {
+      "type": "json",
+      "path": "config/template_fields.json"
+    },
+    "classic_popescu": {
+      "type": "yaml",
+      "key": "classic_popescu"
+    },
+    "scan_flat": {
+      "type": "yaml",
+      "key": "scan_flat"
+    },
+    "classic_cenuse": {
+      "type": "yaml",
+      "key": "classic_cenuse"
+    },
+    "eid_flat": {
+      "type": "yaml",
+      "key": "eid_flat"
+    },
+    "eid_specimen_v2": {
+      "type": "yaml",
+      "key": "eid_specimen_v2"
+    },
+    "phone_angle": {
+      "type": "yaml",
+      "key": "phone_angle"
+    },
+    "eid_phone_hand": {
+      "type": "yaml",
+      "key": "eid_phone_hand"
+    }
+  },
+  "weights": {
+    "classic_reference": 25,
+    "classic_popescu": 10,
+    "scan_flat": 5,
+    "classic_cenuse": 5,
+    "eid_flat": 18,
+    "eid_specimen_v2": 17,
+    "phone_angle": 10,
+    "eid_phone_hand": 10
+  }
+}
