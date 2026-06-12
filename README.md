@@ -25,7 +25,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Plasează template-ul HD în `templates/classic_reference.png` (local, gitignored dacă e poză reală).
+Template-urile specimen sunt în `templates/*.png` (inclusiv `classic_reference.png`). Pentru **generare + antrenare în cloud** fără PC: [colab/train_paddleocr.ipynb](colab/train_paddleocr.ipynb) — vezi [colab/README.md](colab/README.md).
 
 ## Calibrare câmpuri (Faza 1)
 

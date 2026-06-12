@@ -8,7 +8,7 @@ Ghid pentru rulare **noaptea**: ce rulezi unde, ce intră în git și cum folose
 
 | Pas | Unde îl rulezi | În git? |
 |-----|----------------|---------|
-| **1. Generare imagini** (`generate.py`) | PC local sau VPS cu CPU (merge fără GPU) | **Nu** — folderul `dataset/` e mare (zeci de GB la 50k) |
+| **1. Generare imagini** (`generate.py`) | PC local, VPS CPU sau **Google Colab** (notebook `colab/`) | **Nu** — folderul `dataset/` e mare (zeci de GB la 50k) |
 | **2. Template-uri** (`templates/*.png` specimen) | În git | **Da** |
 | **3. Conversie etichete** | Oriunde ai `dataset/` | **Da** — scriptul `scripts/convert_to_paddle_rec.py` |
 | **4. Antrenare model** | Mașină cu **GPU** (PC local cu NVIDIA sau VPS cloud) | **Nu** — greutăți `.pdparams` / export (sute MB–GB) |
@@ -165,6 +165,26 @@ Pe serverul de producție:
 2. Copiază doar folderul model exportat (ex. `rsync`, SCP, volume Docker montat).
 3. `backend/.env`: `OCR_DRIVER=paddle`, `PADDLE_OCR_URL=...`
 4. `services/paddle-ocr/.env`: `PADDLE_DEVICE=gpu` dacă serverul are GPU.
+
+---
+
+## Google Colab (generare + antrenare)
+
+Tot pipeline-ul poate rula în cloud, fără PC:
+
+1. Publică repo-ul `ro-id` pe GitHub (vezi [GITHUB.md](GITHUB.md)) — include `templates/*.png` specimen și `templates/classic_reference.png`.
+2. Deschide [colab/train_paddleocr.ipynb](colab/train_paddleocr.ipynb) → **Runtime → GPU** → **Run All**.
+3. Setează `REPO_URL` și, recomandat, `DATASET_DIR` pe Google Drive (datasetul rămâne după ce expiră sesiunea Colab).
+
+```python
+GENERATE_DATASET = True
+GENERATE_COUNT = 5000
+DATASET_DIR = "/content/drive/MyDrive/ro-id/dataset_colab"
+MOUNT_GOOGLE_DRIVE = True
+SKIP_GENERATION_IF_EXISTS = True   # a doua rulare: doar antrenare
+```
+
+Detalii, timpi estimați și moduri (upload ZIP, doar antrenare): [colab/README.md](colab/README.md).
 
 ---
 

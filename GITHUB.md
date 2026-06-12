@@ -70,10 +70,14 @@ $env:PADDLE_OCR_ROOT = "d:\FRCHub\services\paddle-ocr"
 .\scripts\train_and_deploy.ps1 -Dataset dataset_v4 -Device gpu:0
 ```
 
-## Google Colab
+## Google Colab (generare + antrenare)
 
-1. În notebook: `REPO_URL = "https://github.com/<USER>/ro-id.git"`
-2. [Open in Colab](https://colab.research.google.com/github/<USER>/ro-id/blob/main/colab/train_paddleocr.ipynb)
+Notebook-ul rulează **tot** în cloud: `generate.py` → antrenare → `model_export.zip`.
+
+1. Asigură-te că `templates/*.png` și `templates/classic_reference.png` sunt în repo (nu doar local).
+2. În notebook: `REPO_URL = "https://github.com/<USER>/ro-id.git"`
+3. [Open in Colab](https://colab.research.google.com/github/<USER>/ro-id/blob/main/colab/train_paddleocr.ipynb)
+4. `GENERATE_DATASET = True`, `DATASET_DIR` pe Google Drive recomandat.
 
 Detalii: [colab/README.md](colab/README.md)
 
