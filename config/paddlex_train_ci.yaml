@@ -1,0 +1,39 @@
+# PaddleX — fine-tuning rec CI (latin PP-OCRv5 mobile)
+# Căile dataset_dir / output / device se suprascriu din train_and_deploy.py
+
+Global:
+  model: latin_PP-OCRv5_mobile_rec
+  mode: train
+  dataset_dir: "PLACEHOLDER_DATASET"
+  device: cpu
+  output: "PLACEHOLDER_OUTPUT"
+
+CheckDataset:
+  convert:
+    enable: False
+  split:
+    enable: False
+
+Train:
+  # Config PaddleOCR complet (Train.dataset, Architecture, ...) — nu stub-ul din PaddleOCR_api/configs
+  basic_config_path: "PLACEHOLDER_OCR_TRAIN_CONFIG"
+  epochs_iters: 15
+  batch_size: 16
+  learning_rate: 0.0005
+  pretrain_weight_path: https://paddle-model-ecology.bj.bcebos.com/paddlex/official_pretrained_model/latin_PP-OCRv5_mobile_rec_pretrained.pdparams
+  resume_path: null
+  log_interval: 50
+  eval_interval: 1
+  save_interval: 1
+
+Evaluate:
+  weight_path: "PLACEHOLDER_OUTPUT/best_accuracy/best_accuracy.pdparams"
+  log_interval: 1
+
+Export:
+  weight_path: "PLACEHOLDER_OUTPUT/best_accuracy/best_accuracy.pdparams"
+
+Predict:
+  batch_size: 1
+  model_dir: "PLACEHOLDER_OUTPUT/best_accuracy/inference"
+  input: "PLACEHOLDER_DATASET/images"

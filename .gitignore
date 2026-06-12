@@ -1,0 +1,19 @@
+dataset/
+dataset_test/
+# Liste derivate pentru Paddle (regenerabile din train.txt)
+dataset/**/paddle_rec/
+dataset/**/paddlex/
+training_output/
+exports/
+colab/model_export.zip
+.venv/
+__pycache__/
+*.pyc
+
+# Doar specimen-ele din repo sunt OK; ignoră alte formate/backup-uri locale
+templates/*.jpg
+templates/*.jpeg
+templates/*.webp
+templates/*_private*
+templates/*_real*
+templates/classic_reference.png

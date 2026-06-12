@@ -1,0 +1,13 @@
+# Dependențe în venv-ul services/paddle-ocr (antrenare PaddleX check_dataset)
+# Instalare: paddle-ocr\.venv\Scripts\pip install -r requirements-train.txt
+matplotlib>=3.7.0
+opencv-contrib-python>=4.8.0
+scikit-image>=0.22.0
+albumentations>=1.4.0
+albucore
+shapely
+pyclipper
+lmdb
+pyyaml
+tqdm
+rapidfuzz

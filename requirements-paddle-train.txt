@@ -1,0 +1,15 @@
+# Mediu antrenare PaddleOCR — repo standalone (fără FRCHub).
+#   python -m venv .venv
+#   .venv\Scripts\activate   # Windows
+#   pip install -r requirements-paddle-train.txt
+#
+# GPU NVIDIA (Linux/Colab): înlocuiește prima linie cu paddlepaddle-gpu (vezi colab/README.md).
+
+paddlepaddle>=3.2.0,<3.3.0
+paddleocr>=3.0.0,<4.0.0
+python-dotenv>=1.0.0
+Pillow>=10.4.0
+opencv-python-headless>=4.8.0
+
+-r requirements-train.txt
+-r requirements.txt

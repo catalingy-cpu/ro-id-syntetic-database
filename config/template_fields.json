@@ -1,0 +1,105 @@
+{
+  "template_image": "templates/classic_reference.png",
+  "width": 1024,
+  "height": 725,
+  "kind": "classic",
+  "description": "ROI calibrat pe corecțiile mov ale utilizatorului (1024×725)",
+  "fields": {
+    "series": {
+      "x": 550,
+      "y": 100,
+      "width": 110,
+      "height": 42,
+      "ink": "dark",
+      "align": "left"
+    },
+    "number": {
+      "x": 640,
+      "y": 97,
+      "width": 180,
+      "height": 45,
+      "ink": "dark",
+      "align": "left"
+    },
+    "cnp": {
+      "x": 364,
+      "y": 125,
+      "width": 457,
+      "height": 52,
+      "ink": "cnp_multicolor",
+      "align": "left"
+    },
+    "surname": {
+      "x": 319,
+      "y": 194,
+      "width": 484,
+      "height": 45,
+      "ink": "dark",
+      "align": "left"
+    },
+    "given_name": {
+      "x": 319,
+      "y": 245,
+      "width": 484,
+      "height": 45,
+      "ink": "dark",
+      "align": "left"
+    },
+    "nationality": {
+      "x": 319,
+      "y": 301,
+      "width": 484,
+      "height": 45,
+      "ink": "dark",
+      "align": "left"
+    },
+    "birth_place": {
+      "x": 319,
+      "y": 352,
+      "width": 484,
+      "height": 45,
+      "ink": "dark",
+      "align": "left"
+    },
+    "address_line1": {
+      "x": 319,
+      "y": 405,
+      "width": 484,
+      "height": 47,
+      "ink": "dark",
+      "align": "left"
+    },
+    "address_line2": {
+      "x": 319,
+      "y": 452,
+      "width": 484,
+      "height": 40,
+      "ink": "dark",
+      "align": "left"
+    },
+    "sex": {
+      "x": 862,
+      "y": 296,
+      "width": 120,
+      "height": 34,
+      "ink": "dark",
+      "align": "center"
+    },
+    "issued_by": {
+      "x": 324,
+      "y": 493,
+      "width": 288,
+      "height": 45,
+      "ink": "dark",
+      "align": "left"
+    },
+    "validity": {
+      "x": 709,
+      "y": 488,
+      "width": 288,
+      "height": 40,
+      "ink": "dark",
+      "align": "left"
+    }
+  }
+}
