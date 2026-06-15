@@ -169,41 +169,39 @@ def run_paddlex_engine(
     run_cmd(cmd, cwd=cwd, env=env)
 
 
-def paddlex_repos_dir() -> Path:
-    return (
-        paddle_ocr_root()
-        / ".venv"
-        / "Lib"
-        / "site-packages"
-        / "paddlex"
-        / "repo_manager"
-        / "repos"
+def paddlex_package_root(paddle_py: Path) -> Path:
+    proc = subprocess.run(
+        [
+            str(paddle_py),
+            "-c",
+            "import paddlex; from pathlib import Path; print(Path(paddlex.__file__).resolve().parent)",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
     )
+    return Path(proc.stdout.strip())
 
 
-def bundled_paddleocr_api() -> Path:
-    return (
-        paddle_ocr_root()
-        / ".venv"
-        / "Lib"
-        / "site-packages"
-        / "paddlex"
-        / "repo_apis"
-        / "PaddleOCR_api"
-    )
+def paddlex_repos_dir(paddle_py: Path) -> Path:
+    return paddlex_package_root(paddle_py) / "repo_manager" / "repos"
 
 
-def paddleocr_repo_dir() -> Path:
-    return paddlex_repos_dir() / "PaddleOCR"
+def bundled_paddleocr_api(paddle_py: Path) -> Path:
+    return paddlex_package_root(paddle_py) / "repo_apis" / "PaddleOCR_api"
 
 
-def paddleocr_train_config(*, fast: bool = False) -> Path:
+def paddleocr_repo_dir(paddle_py: Path) -> Path:
+    return paddlex_repos_dir(paddle_py) / "PaddleOCR"
+
+
+def paddleocr_train_config(paddle_py: Path, *, fast: bool = False) -> Path:
     """Config YAML PaddleOCR pentru antrenare rec."""
     if fast:
         fast_cfg = repo_root() / "config" / "ocr_train_ci_fast.yml"
         if fast_cfg.is_file():
             return fast_cfg.resolve()
-    repo = paddleocr_repo_dir()
+    repo = paddleocr_repo_dir(paddle_py)
     candidates = (
         repo / "configs/rec/PP-OCRv5/multi_language/latin_PP-OCRv5_mobile_rec.yml",
         repo / "configs/rec/PP-OCRv5/latin_PP-OCRv5_mobile_rec.yml",
@@ -302,41 +300,72 @@ def print_train_plan(
         print("Fast: fara augmentari grele (RecConAug/RecAug), batch marit.")
 
 
+def _paddlex_cli(paddle_py: Path) -> list[str]:
+    win = paddle_ocr_root() / ".venv" / "Scripts" / "paddlex.exe"
+    if win.is_file():
+        return [str(win)]
+    unix = paddle_ocr_root() / ".venv" / "bin" / "paddlex"
+    if unix.is_file():
+        return [str(unix)]
+    which = shutil.which("paddlex")
+    if which:
+        return [which]
+    return [str(paddle_py), "-m", "paddlex"]
+
+
+def _clone_paddleocr_repo(repo_dir: Path) -> None:
+    if (repo_dir / "tools" / "train.py").is_file():
+        return
+    if repo_dir.exists():
+        shutil.rmtree(repo_dir)
+    repo_dir.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Clone PaddleOCR → {repo_dir}")
+    run_cmd(
+        [
+            "git",
+            "clone",
+            "--depth",
+            "1",
+            "https://github.com/PaddlePaddle/PaddleOCR.git",
+            str(repo_dir),
+        ],
+    )
+
+
 def ensure_paddlex_runtime(paddle_py: Path, cwd: Path, *, force_repo_install: bool = False) -> Path:
     """Pregătește runtime PaddleX pentru antrenare rec și întoarce calea repo PaddleOCR."""
-    repos = paddlex_repos_dir()
+    repos = paddlex_repos_dir(paddle_py)
     repos.mkdir(parents=True, exist_ok=True)
-    repo_dir = paddleocr_repo_dir()
+    repo_dir = paddleocr_repo_dir(paddle_py)
     tools_train = repo_dir / "tools" / "train.py"
     if tools_train.is_file():
         return repo_dir
 
-    if bundled_paddleocr_api().is_dir() and not force_repo_install:
+    if bundled_paddleocr_api(paddle_py).is_dir() and not force_repo_install:
         print(
             "PaddleOCR_api există în PaddleX, dar pentru train/export este necesar "
             "repo-ul PaddleOCR (tools/train.py). Încerc instalare automată..."
         )
 
-    if repo_dir.is_dir():
+    if repo_dir.is_dir() and tools_train.is_file():
         return repo_dir
 
-    print("Instalare repo PaddleOCR pentru PaddleX (fără deps, necesită rețea)...")
-    paddlex = paddle_ocr_root() / ".venv" / "Scripts" / "paddlex.exe"
-    if not paddlex.is_file():
-        paddlex = paddle_py
+    print("Instalare repo PaddleOCR pentru antrenare (git clone / paddlex)...")
     try:
-        run_cmd([str(paddlex), "--install", "PaddleOCR", "-y", "--no_deps"], cwd=cwd)
-    except subprocess.CalledProcessError as exc:
-        if tools_train.is_file():
-            return repo_dir
-        raise SystemExit(
-            "Nu pot instala repo PaddleOCR pentru train/export.\n"
-            f"Detalii: {exc}"
-        ) from exc
+        run_cmd([*_paddlex_cli(paddle_py), "--install", "PaddleOCR", "-y", "--no_deps"], cwd=cwd)
+    except subprocess.CalledProcessError:
+        print("paddlex --install a eșuat; încerc git clone direct...")
+        try:
+            _clone_paddleocr_repo(repo_dir)
+        except subprocess.CalledProcessError as exc:
+            raise SystemExit(
+                "Nu pot instala repo PaddleOCR pentru train/export.\n"
+                f"Detalii: {exc}"
+            ) from exc
     if not tools_train.is_file():
         raise SystemExit(
             f"Instalarea s-a încheiat, dar lipsește {tools_train}. "
-            "Rulează manual `paddlex --install PaddleOCR -y --no_deps` și reîncearcă."
+            "Rulează manual `paddlex --install PaddleOCR -y --no_deps` sau verifică rețeaua."
         )
     return repo_dir
 
@@ -380,7 +409,7 @@ def ensure_training_deps(paddle_py: Path) -> None:
         return
     root = repo_root()
     req_files: list[Path] = []
-    ocr_req = paddleocr_repo_dir() / "requirements.txt"
+    ocr_req = paddleocr_repo_dir(paddle_py) / "requirements.txt"
     local_req = root / "requirements-train.txt"
     if ocr_req.is_file():
         req_files.append(ocr_req)
@@ -671,7 +700,7 @@ def main() -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
         if args.fast:
             apply_fast_train_patches(ocr_repo)
-        ocr_src = paddleocr_train_config(fast=args.fast)
+        ocr_src = paddleocr_train_config(paddle_py, fast=args.fast)
         batch_size = (
             args.batch_size
             if args.batch_size is not None
@@ -751,7 +780,7 @@ def main() -> None:
             )
         else:
             train_config = ensure_config_beside_weights(pdparams, output_dir)
-            repo_dir = paddleocr_repo_dir()
+            repo_dir = paddleocr_repo_dir(paddle_py)
             export_env = {"PADDLE_PDX_PADDLEOCR_PATH": str(repo_dir)} if repo_dir.is_dir() else None
 
             print("=== Export inference ===")
