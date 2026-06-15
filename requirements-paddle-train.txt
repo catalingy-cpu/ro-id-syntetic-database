@@ -3,9 +3,9 @@
 #   .venv\Scripts\activate   # Windows
 #   pip install -r requirements-paddle-train.txt
 #
-# GPU NVIDIA (Linux/Colab): înlocuiește prima linie cu paddlepaddle-gpu (vezi colab/README.md).
+# GPU NVIDIA (Linux/Colab): folosește colab/install_paddle.py (detectează CUDA 12.6/12.9 etc.)
 
-paddlepaddle>=3.2.0,<3.3.0
+paddlepaddle>=3.2.0,<3.4.0
 paddleocr>=3.0.0,<4.0.0
 python-dotenv>=1.0.0
 Pillow>=10.4.0

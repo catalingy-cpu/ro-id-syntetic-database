@@ -49,6 +49,8 @@ Spațiul `/content` din Colab **se șterge** când sesiunea expiră. Datasetul g
 | Generare 50k | câteva ore |
 | Antrenare 15 epoci (GPU T4) | 1–4 ore |
 
+Dacă `paddlepaddle-gpu` pică la install: **Runtime → GPU**, apoi re-rulează celula Paddle (folosește `colab/install_paddle.py`, nu `cu123` fix).
+
 ## Template-uri
 
 Specimen-ele CI (`templates/*.png`) sunt **în git** — Colab le clonează automat. Nu încărca poze reale de buletin.
