@@ -166,11 +166,11 @@ def link_images(px_dir: Path, images_dir: Path) -> None:
             )
         else:
             link.symlink_to(images_dir.resolve(), target_is_directory=True)
-    except (OSError, subprocess.CalledProcessError) as exc:
-        raise SystemExit(
-            f"Nu pot lega {link} -> {images_dir} ({exc}).\n"
-            "Windows: rulează terminal Administrator, sau copiază manual images/ în dataset/paddlex/images"
-        ) from exc
+    except (OSError, subprocess.CalledProcessError):
+        print(f"Symlink indisponibil, copiez {images_dir} → {link}")
+        if link.exists():
+            return
+        shutil.copytree(images_dir, link)
 
 
 def main() -> None:

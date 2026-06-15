@@ -379,6 +379,13 @@ def _venv_can_import(paddle_py: Path, module: str) -> bool:
     return proc.returncode == 0
 
 
+def ensure_paddlex_package(paddle_py: Path) -> None:
+    if _venv_can_import(paddle_py, "paddlex"):
+        return
+    print("Instalare paddlex (necesar pentru antrenare)...")
+    run_cmd([str(paddle_py), "-m", "pip", "install", "paddlex"])
+
+
 def ensure_training_deps(paddle_py: Path) -> None:
     """matplotlib, PaddleOCR train deps etc. în venv-ul paddle-ocr."""
     ver = subprocess.run(
@@ -658,7 +665,8 @@ def main() -> None:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     args = parse_args()
     root = repo_root()
-    dataset_root = (root / args.dataset).resolve()
+    ds = Path(args.dataset)
+    dataset_root = ds.resolve() if ds.is_absolute() else (root / ds).resolve()
     output_dir = (root / args.output).resolve()
     ocr_root = paddle_ocr_root(args.paddle_ocr_root)
     paddle_py = Path(args.paddle_python) if args.paddle_python else default_paddle_python(args.paddle_ocr_root)
@@ -687,6 +695,7 @@ def main() -> None:
     if not args.skip_train:
         if not (dataset_root / "labels" / "train.txt").is_file():
             raise SystemExit(f"Lipsește {dataset_root / 'labels' / 'train.txt'} — rulează generate.py")
+        ensure_paddlex_package(paddle_py)
         run_cmd([sys.executable, str(prepare_script), "--dataset", str(dataset_root)], cwd=root)
         ocr_repo = ensure_paddlex_runtime(
             paddle_py,
