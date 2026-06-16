@@ -49,6 +49,8 @@ Spațiul `/content` din Colab **se șterge** când sesiunea expiră. Datasetul g
 | Generare 50k | câteva ore |
 | Antrenare 15 epoci (GPU T4) | 1–4 ore |
 
+**OOM pe GPU?** Scade `BATCH_SIZE` (32 sau 16), pune `USE_FAST = True`, `Runtime → Restart session`, rulează doar celula de antrenare.
+
 Dacă `paddlepaddle-gpu` pică la install: **Runtime → GPU**, apoi re-rulează celula Paddle (folosește `colab/install_paddle.py`, nu `cu123` fix).
 
 ## Template-uri
