@@ -44,7 +44,32 @@ def parse_args() -> argparse.Namespace:
         default=25,
         help="Lungime maxima eticheta OCR; randurile mai lungi sunt omise.",
     )
+    p.add_argument(
+        "--fields",
+        type=str,
+        default="",
+        help="template_fields.json pentru crop pe ROI calibrat (recomandat).",
+    )
     return p.parse_args()
+
+
+def default_fields_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "config" / "template_fields.json"
+
+
+# Cheie din transcript (NUME, CNP, ...) -> camp in template_fields.json
+TRANSCRIPT_FIELD_TO_ROI: dict[str, str] = {
+    "NUME": "surname",
+    "PRENUME": "given_name",
+    "CNP": "cnp",
+    "SERIE": "series",
+    "NUMAR": "number",
+    "SEX": "sex",
+    "CETATENIE": "nationality",
+    "EMISA_DE": "issued_by",
+    "ADRESA": "address_line1",
+    "ADRESA2": "address_line2",
+}
 
 
 def load_rows(train_file: Path) -> list[tuple[str, str]]:
@@ -69,22 +94,65 @@ def _normalize_label(label: str) -> str:
     return " ".join(label.replace("\t", " ").split()).strip()
 
 
-def _line_texts_from_transcription(text: str) -> list[str]:
-    lines: list[str] = []
+def _line_texts_from_transcription(text: str) -> list[tuple[str, str]]:
+    """Returneaza (CHEIE, valoare) pentru fiecare rand din transcript."""
+    lines: list[tuple[str, str]] = []
     for raw in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
         line = raw.strip()
         if not line:
             continue
         if ":" in line:
-            _, value = line.split(":", 1)
+            key, value = line.split(":", 1)
             value = _normalize_label(value)
             if value:
-                lines.append(value)
+                lines.append((key.strip().upper(), value))
         else:
             value = _normalize_label(line)
             if value:
-                lines.append(value)
+                lines.append(("", value))
     return lines
+
+
+def _load_template_fields(path: Path) -> tuple[int, int, dict[str, dict[str, int]]]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    tpl_w = int(data.get("width") or 0)
+    tpl_h = int(data.get("height") or 0)
+    fields = data.get("fields") or {}
+    if tpl_w <= 0 or tpl_h <= 0 or not isinstance(fields, dict):
+        raise SystemExit(f"template_fields invalid: {path}")
+    out: dict[str, dict[str, int]] = {}
+    for name, spec in fields.items():
+        if not isinstance(spec, dict):
+            continue
+        out[str(name)] = {
+            "x": int(spec["x"]),
+            "y": int(spec["y"]),
+            "width": int(spec["width"]),
+            "height": int(spec["height"]),
+        }
+    return tpl_w, tpl_h, out
+
+
+def _crop_from_roi(
+    im: Image.Image,
+    field: dict[str, int],
+    tpl_w: int,
+    tpl_h: int,
+    *,
+    pad_px: int = 2,
+) -> Image.Image | None:
+    w, h = im.size
+    if w <= 0 or h <= 0:
+        return None
+    sx = w / float(tpl_w)
+    sy = h / float(tpl_h)
+    x0 = max(0, int(round(field["x"] * sx)) - pad_px)
+    y0 = max(0, int(round(field["y"] * sy)) - pad_px)
+    x1 = min(w, int(round((field["x"] + field["width"]) * sx)) + pad_px)
+    y1 = min(h, int(round((field["y"] + field["height"]) * sy)) + pad_px)
+    if x1 - x0 < 4 or y1 - y0 < 4:
+        return None
+    return im.crop((x0, y0, x1, y1))
 
 
 def _resize_crop(img: Image.Image, target_height: int, max_width: int) -> Image.Image:
@@ -108,20 +176,33 @@ def make_line_crops(
     target_height: int,
     max_width: int,
     max_label_len: int,
+    fields_path: Path | None,
 ) -> list[tuple[str, str]]:
     line_dir = px_dir / "line_images"
     if line_dir.exists():
         shutil.rmtree(line_dir)
     line_dir.mkdir(parents=True, exist_ok=True)
 
+    tpl_w = tpl_h = 0
+    roi_fields: dict[str, dict[str, int]] = {}
+    if fields_path and fields_path.is_file():
+        tpl_w, tpl_h, roi_fields = _load_template_fields(fields_path)
+        print(f"  crop ROI: {fields_path.name} ({tpl_w}x{tpl_h}, {len(roi_fields)} campuri)")
+    else:
+        raise SystemExit(
+            "Lipseste template_fields.json — crop-urile pe benzi orizontale antreneaza gresit.\n"
+            "Foloseste: --fields config/template_fields.json"
+        )
+
     samples: list[tuple[str, str]] = []
     skipped_long = 0
+    skipped_no_roi = 0
     for rel, transcript in rows:
         src = root / rel
         if not src.is_file():
             continue
-        lines = _line_texts_from_transcription(transcript)
-        if not lines:
+        labeled = _line_texts_from_transcription(transcript)
+        if not labeled:
             continue
         try:
             with Image.open(src) as im:
@@ -130,31 +211,33 @@ def make_line_crops(
                 if w <= 0 or h <= 0:
                     continue
                 stem = Path(rel).stem
-                n = len(lines)
-                for idx, line in enumerate(lines):
+                crop_idx = 0
+                for key, line in labeled:
                     if len(line) > max_label_len:
                         skipped_long += 1
                         continue
-                    y0 = max(0, int((idx / n) * h))
-                    y1 = min(h, int(((idx + 1) / n) * h))
-                    if y1 - y0 < 4:
+                    roi_key = TRANSCRIPT_FIELD_TO_ROI.get(key)
+                    if not roi_key or roi_key not in roi_fields:
+                        skipped_no_roi += 1
                         continue
-                    # Mic padding vertical pentru robustete pe layout-uri usor diferite.
-                    pad = max(1, int(0.02 * (y1 - y0)))
-                    y0p = max(0, y0 - pad)
-                    y1p = min(h, y1 + pad)
-                    crop = im.crop((0, y0p, w, y1p))
-                    crop = _resize_crop(crop, target_height, max_width)
-                    name = f"{stem}_l{idx:02d}.jpg"
+                    raw_crop = _crop_from_roi(im, roi_fields[roi_key], tpl_w, tpl_h)
+                    if raw_crop is None:
+                        skipped_no_roi += 1
+                        continue
+                    crop = _resize_crop(raw_crop, target_height, max_width)
+                    name = f"{stem}_{roi_key}_{crop_idx:02d}.jpg"
                     out_file = line_dir / name
                     crop.save(out_file, format="JPEG", quality=90, optimize=True)
                     samples.append((f"line_images/{name}", _normalize_label(line)))
+                    crop_idx += 1
         except OSError:
             continue
     if skipped_long:
         print(
             f"  atentie: {skipped_long} line-crops omise (eticheta > {max_label_len} caractere)"
         )
+    if skipped_no_roi:
+        print(f"  atentie: {skipped_no_roi} randuri fara ROI mapat (date etc.)")
     return samples
 
 
@@ -205,6 +288,7 @@ def main() -> None:
     px_dir.mkdir(parents=True, exist_ok=True)
 
     if args.line_crops:
+        fields_path = Path(args.fields).resolve() if args.fields else default_fields_path()
         all_samples = make_line_crops(
             root,
             rows,
@@ -212,6 +296,7 @@ def main() -> None:
             args.target_height,
             args.max_width,
             args.max_label_len,
+            fields_path,
         )
         if not all_samples:
             raise SystemExit("Nu am putut genera line-crops. Verifica dataset/images si labels/train.txt")

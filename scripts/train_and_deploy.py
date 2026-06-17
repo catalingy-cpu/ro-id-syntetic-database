@@ -696,7 +696,11 @@ def main() -> None:
         if not (dataset_root / "labels" / "train.txt").is_file():
             raise SystemExit(f"Lipsește {dataset_root / 'labels' / 'train.txt'} — rulează generate.py")
         ensure_paddlex_package(paddle_py)
-        run_cmd([sys.executable, str(prepare_script), "--dataset", str(dataset_root)], cwd=root)
+        fields_json = root / "config" / "template_fields.json"
+        prepare_cmd = [sys.executable, str(prepare_script), "--dataset", str(dataset_root)]
+        if fields_json.is_file():
+            prepare_cmd.extend(["--fields", str(fields_json)])
+        run_cmd(prepare_cmd, cwd=root)
         ocr_repo = ensure_paddlex_runtime(
             paddle_py,
             ocr_root,
