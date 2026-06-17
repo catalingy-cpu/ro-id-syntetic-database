@@ -228,7 +228,7 @@ def default_batch_size(device: str, *, fast: bool) -> int:
 
 def default_num_workers(device: str, *, fast: bool) -> int:
     if fast or sys.platform == "win32":
-        return 0 if not is_gpu_device(device) else 2
+        return 0
     return 4 if is_gpu_device(device) else 0
 
 

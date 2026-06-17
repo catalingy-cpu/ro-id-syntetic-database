@@ -29,14 +29,20 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--target-height",
         type=int,
-        default=64,
-        help="Inaltime tinta pentru fiecare line-crop.",
+        default=48,
+        help="Inaltime tinta pentru fiecare line-crop (PP-OCRv5 rec: 48).",
     )
     p.add_argument(
         "--max-width",
         type=int,
-        default=1024,
-        help="Latime maxima dupa resize pentru line-crops.",
+        default=320,
+        help="Latime fixa dupa resize+pad pentru line-crops (PP-OCRv5 rec: 320).",
+    )
+    p.add_argument(
+        "--max-label-len",
+        type=int,
+        default=25,
+        help="Lungime maxima eticheta OCR; randurile mai lungi sunt omise.",
     )
     return p.parse_args()
 
@@ -82,20 +88,26 @@ def _line_texts_from_transcription(text: str) -> list[str]:
 
 
 def _resize_crop(img: Image.Image, target_height: int, max_width: int) -> Image.Image:
+    """Resize proportional to target_height, then pad to fixed (max_width, target_height)."""
     w, h = img.size
-    if h <= 0:
-        return img
+    if h <= 0 or w <= 0:
+        return Image.new("RGB", (max_width, target_height), (255, 255, 255))
     new_w = max(1, int(round(w * (target_height / float(h)))))
-    new_h = target_height
     if new_w > max_width:
-        scale = max_width / float(new_w)
-        new_w = max(1, int(round(new_w * scale)))
-        new_h = max(1, int(round(new_h * scale)))
-    return img.resize((new_w, new_h), resample=Image.Resampling.BICUBIC)
+        new_w = max_width
+    resized = img.resize((new_w, target_height), resample=Image.Resampling.BICUBIC)
+    canvas = Image.new("RGB", (max_width, target_height), (255, 255, 255))
+    canvas.paste(resized, (0, 0))
+    return canvas
 
 
 def make_line_crops(
-    root: Path, rows: list[tuple[str, str]], px_dir: Path, target_height: int, max_width: int
+    root: Path,
+    rows: list[tuple[str, str]],
+    px_dir: Path,
+    target_height: int,
+    max_width: int,
+    max_label_len: int,
 ) -> list[tuple[str, str]]:
     line_dir = px_dir / "line_images"
     if line_dir.exists():
@@ -103,6 +115,7 @@ def make_line_crops(
     line_dir.mkdir(parents=True, exist_ok=True)
 
     samples: list[tuple[str, str]] = []
+    skipped_long = 0
     for rel, transcript in rows:
         src = root / rel
         if not src.is_file():
@@ -119,6 +132,9 @@ def make_line_crops(
                 stem = Path(rel).stem
                 n = len(lines)
                 for idx, line in enumerate(lines):
+                    if len(line) > max_label_len:
+                        skipped_long += 1
+                        continue
                     y0 = max(0, int((idx / n) * h))
                     y1 = min(h, int(((idx + 1) / n) * h))
                     if y1 - y0 < 4:
@@ -135,6 +151,10 @@ def make_line_crops(
                     samples.append((f"line_images/{name}", _normalize_label(line)))
         except OSError:
             continue
+    if skipped_long:
+        print(
+            f"  atentie: {skipped_long} line-crops omise (eticheta > {max_label_len} caractere)"
+        )
     return samples
 
 
@@ -185,7 +205,14 @@ def main() -> None:
     px_dir.mkdir(parents=True, exist_ok=True)
 
     if args.line_crops:
-        all_samples = make_line_crops(root, rows, px_dir, args.target_height, args.max_width)
+        all_samples = make_line_crops(
+            root,
+            rows,
+            px_dir,
+            args.target_height,
+            args.max_width,
+            args.max_label_len,
+        )
         if not all_samples:
             raise SystemExit("Nu am putut genera line-crops. Verifica dataset/images si labels/train.txt")
         rows = all_samples
