@@ -74,10 +74,11 @@ $env:PADDLE_OCR_ROOT = "d:\FRCHub\services\paddle-ocr"
 
 Notebook-ul rulează **tot** în cloud: `generate.py` → antrenare → `model_export.zip`.
 
-1. Asigură-te că `templates/*.png` și `templates/classic_reference.png` sunt în repo (nu doar local).
-2. În notebook: `REPO_URL = "https://github.com/<USER>/ro-id.git"`
+1. Asigură-te că `templates/*.png` sunt în repo.
+2. În notebook: `REPO_URL`, `FORCE_REFRESH_REPO = True`
 3. [Open in Colab](https://colab.research.google.com/github/<USER>/ro-id/blob/main/colab/train_paddleocr.ipynb)
-4. `GENERATE_DATASET = True`, `DATASET_DIR` pe Google Drive recomandat.
+4. **`TRAIN_PROFILE = "smoke"`** (1200 img, 3 epoci, doar `classic_reference`) — testează modelul în FRCHub
+5. Dacă smoke e OK → `TRAIN_PROFILE = "main"` (6000 img, 10 epoci)
 
 Detalii: [colab/README.md](colab/README.md)
 

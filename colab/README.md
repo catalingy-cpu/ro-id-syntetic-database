@@ -4,58 +4,63 @@ Tot pipeline-ul într-un singur notebook: **imagini sintetice** → **antrenare 
 
 ## Pași rapizi
 
-1. Deschide [train_paddleocr.ipynb](./train_paddleocr.ipynb) în Colab  
-   `https://colab.research.google.com/github/USER/ro-id/blob/main/colab/train_paddleocr.ipynb`
-2. Setează `REPO_URL` (repo GitHub `ro-id`)
+1. Deschide [train_paddleocr.ipynb](./train_paddleocr.ipynb) în Colab
+2. Setează `REPO_URL` (repo GitHub)
 3. **Runtime → GPU**
-4. **Run All**
-5. Descarcă `model_export.zip` → copiază în `FRCHub/services/paddle-ocr/models/`
+4. Lasă `TRAIN_PROFILE = "smoke"` și **Run All**
+5. Descarcă `model_export.zip` → testează pe CI reale în FRCHub
+6. Dacă e OK → `TRAIN_PROFILE = "main"` și rulează din nou
+
+## Profiluri antrenare (fail-fast)
+
+| Profil | Ce face | Când |
+|--------|---------|------|
+| **`smoke`** (implicit) | `classic_reference` only, 1200 img, 3 epoci | Întotdeauna primul run |
+| **`main`** | `classic_reference` only, 6000 img, 10 epoci | Doar după ce smoke e OK pe poze reale |
+
+În celula de config:
+
+```python
+TRAIN_PROFILE = "smoke"  # sau "main"
+FORCE_REFRESH_REPO = True
+GENERATE_MULTI = False   # setat automat de profil — NU multi până la calibrare ROI
+```
 
 ## Configurare importantă
 
 ```python
 REPO_URL = "https://github.com/USER/ro-id.git"
-
-GENERATE_DATASET = True
-GENERATE_MULTI = True                # clasic + electronic + telefon
-GENERATE_MIX = "config/generation_mix.json"
-GENERATE_COUNT = 5000
-SKIP_GENERATION_IF_EXISTS = True
-
-DATASET_DIR = "/content/drive/MyDrive/ro-id/dataset_colab"
+DATASET_BASE = "/content/drive/MyDrive/ro-id"
 MOUNT_GOOGLE_DRIVE = True
+WIPE_PADDLEX_BEFORE_TRAIN = True
 ```
 
-`classic_reference` (ROI calibrat) rămâne în mix — nu e atins. Pentru un singur template: `GENERATE_MULTI = False`.
+Datasetul merge în subfoldere separate per profil (`dataset_classic_smoke`, `dataset_classic_main`).
 
 ### De ce Google Drive?
 
-Spațiul `/content` din Colab **se șterge** când sesiunea expiră. Datasetul generat rămâne pe Drive dacă `DATASET_DIR` pointează acolo.
+Spațiul `/content` din Colab **se șterge** când sesiunea expiră. Datasetul generat rămâne pe Drive.
 
-## Moduri dataset
+## După antrenare
 
-| Mod | Setări |
-|-----|--------|
-| **Generează în Colab** (implicit) | `GENERATE_DATASET = True` |
-| **Refolosește de pe Drive** | `SKIP_GENERATION_IF_EXISTS = True` + același `DATASET_DIR` |
-| **Upload ZIP** | `GENERATE_DATASET = False`, `UPLOAD_DATASET_ZIP = True` |
-| **Doar antrenare** (fără regen) | `GENERATE_DATASET = False` + dataset deja la `DATASET_DIR` |
+1. Dezarhivează `model_export.zip` în `FRCHub/services/paddle-ocr/models/`
+2. În `services/paddle-ocr/.env`:
+   ```env
+   PADDLE_REC_MODEL_DIR=models/frc_ci_rec/inference
+   PADDLE_REC_MODEL_NAME=latin_PP-OCRv5_mobile_rec
+   ```
+3. Repornește `paddle-ocr` (`.\run.ps1`)
+
+Dacă modelul e prost, comentează cele 2 linii și revii la model stock.
 
 ## Timp estimat
 
-| Pas | Durată orientativă |
-|-----|-------------------|
-| Generare 5k imagini | 30–90 min (CPU Colab) |
-| Generare 50k | câteva ore |
-| Antrenare 15 epoci (GPU T4) | 1–4 ore |
+| Profil | Durată orientativă |
+|--------|-------------------|
+| smoke (gen + train) | 30–90 min |
+| main (gen + train) | 2–5 ore |
 
-**OOM pe GPU?** Scade `BATCH_SIZE` (32 sau 16), pune `USE_FAST = True`, `Runtime → Restart session`, rulează doar celula de antrenare.
-
-Dacă `paddlepaddle-gpu` pică la install: **Runtime → GPU**, apoi re-rulează celula Paddle (folosește `colab/install_paddle.py`, nu `cu123` fix).
-
-## Template-uri
-
-Specimen-ele CI (`templates/*.png`) sunt **în git** — Colab le clonează automat. Nu încărca poze reale de buletin.
+**OOM pe GPU?** `BATCH_SIZE=16`, `USE_FAST=True`, Restart session, rulează doar celula de antrenare.
 
 ## Publicare repo
 
