@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -18,7 +19,13 @@ _VERSIONS = ("3.3.0", "3.2.2", "3.2.0")
 
 
 def _cuda_version() -> str | None:
-    r = subprocess.run(["nvidia-smi"], capture_output=True, text=True)
+    smi = shutil.which("nvidia-smi")
+    if not smi:
+        return None
+    try:
+        r = subprocess.run([smi], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
     m = re.search(r"CUDA Version:\s*(\d+\.\d+)", r.stdout or "")
     return m.group(1) if m else None
 

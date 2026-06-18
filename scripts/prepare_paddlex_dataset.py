@@ -67,8 +67,10 @@ TRANSCRIPT_FIELD_TO_ROI: dict[str, str] = {
     "SEX": "sex",
     "CETATENIE": "nationality",
     "EMISA_DE": "issued_by",
+    "DATA_EXPIRARE": "validity",
     "ADRESA": "address_line1",
     "ADRESA2": "address_line2",
+    "LOC_NASTERE": "birth_place",
 }
 
 

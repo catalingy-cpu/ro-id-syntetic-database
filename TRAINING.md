@@ -4,7 +4,25 @@ Ghid pentru rulare **noaptea**: ce rulezi unde, ce intră în git și cum folose
 
 ---
 
-## Pe scurt: local vs server vs git
+## Start rapid (smoke → Colab → deploy)
+
+```powershell
+cd d:\FRCHub\services\ro-id-synthetic-dataset
+.\scripts\smoke_pipeline.ps1 -Count 800
+```
+
+Creează `dataset_smoke/` + `dataset_smoke.zip` cu **line-crops ROI** (nu benzi orizontale).
+
+1. Încarcă `dataset_smoke.zip` pe Google Drive.
+2. Deschide `colab/train_paddleocr.ipynb` → `TRAIN_PROFILE=smoke`, `GENERATE_DATASET=False`, `UPLOAD_DATASET_ZIP=True`.
+3. După antrenare: decomentează `PADDLE_REC_MODEL_DIR` în `services/paddle-ocr/.env` și repornește `run.ps1`.
+4. Test: `paddle-ocr\scripts\eval_ci_fields.py --dataset dataset_smoke --limit 30`
+
+ROI inferență (`paddle-ocr/app/roi_layout.py`) trebuie să coincidă cu `config/template_fields.json`:
+`python scripts/sync_roi_layout.py` (afișează constantele).
+
+---
+
 
 | Pas | Unde îl rulezi | În git? |
 |-----|----------------|---------|
